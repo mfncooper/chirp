@@ -133,6 +133,9 @@ class ChirpEditor(wx.Panel):
     def status_message(self, message):
         wx.PostEvent(self, StatusMessage(self.GetId(), message=message))
 
+    def refresh(self):
+        pass
+
     def cb_copy(self, cut=False):
         pass
 
@@ -281,6 +284,10 @@ class ChirpSettingGrid(wx.Panel):
     @property
     def name(self):
         return self._group.get_name()
+
+    @property
+    def propgrid(self):
+        return self.pg
 
     def _pg_changed(self, event):
         wx.PostEvent(self, EditorChanged(self.GetId()))

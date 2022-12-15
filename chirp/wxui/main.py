@@ -15,7 +15,6 @@
 
 import datetime
 import functools
-import importlib.resources
 import logging
 import os
 import platform
@@ -25,6 +24,11 @@ import tempfile
 import time
 import webbrowser
 
+if sys.version_info < (3, 10):
+    import importlib_resources
+else:
+    import importlib.resources as importlib_resources
+
 import wx
 import wx.aui
 import wx.lib.newevent
@@ -33,6 +37,7 @@ from chirp import bandplan
 from chirp import chirp_common
 from chirp import directory
 from chirp import errors
+from chirp import logger
 from chirp import platform as chirp_platform
 from chirp.ui import config
 from chirp.wxui import bankedit
@@ -57,20 +62,6 @@ OPEN_RECENT_MENU = None
 OPEN_STOCK_CONFIG_MENU = None
 
 
-def pkg_path(*args):
-    # This is the root of the chirp git tree, or the egg for sdist,
-    # or the bundle directory if frozen.
-    base = os.path.abspath(os.path.join(
-        os.path.dirname(__file__), '..', '..'))
-
-    fn = os.path.join(base, *args)
-    if os.path.exists(fn):
-        return fn
-
-    LOG.error('File not found searching for %r at %r', args, fn)
-    raise FileNotFoundError('Not found: %s' % fn)
-
-
 class ChirpEditorSet(wx.Panel):
     MEMEDIT_CLS = memedit.ChirpMemEdit
     SETTINGS_CLS = settingsedit.ChirpCloneSettingsEdit
@@ -84,6 +75,7 @@ class ChirpEditorSet(wx.Panel):
     def add_editor(self, editor, title):
         self._editors.AddPage(editor, title)
         self.Bind(common.EVT_STATUS_MESSAGE, self._editor_status, editor)
+        self._editor_index[title] = editor
 
     def _editor_status(self, event):
         LOG.info('Editor status: %s' % event.message)
@@ -100,8 +92,9 @@ class ChirpEditorSet(wx.Panel):
         self._modified = not os.path.exists(filename)
 
         self._editors = wx.Notebook(self, style=wx.NB_TOP)
+        self._editor_index = {}
 
-        self._editors.Bind(wx.EVT_NOTEBOOK_PAGE_CHANGING,
+        self._editors.Bind(wx.EVT_NOTEBOOK_PAGE_CHANGED,
                            self._editor_selected)
 
         sizer = wx.BoxSizer()
@@ -137,12 +130,21 @@ class ChirpEditorSet(wx.Panel):
         if (CONF.get_bool('developer', 'state') and
                 not isinstance(radio, chirp_common.LiveRadio)):
             browser = developer.ChirpRadioBrowser(parent_radio, self._editors)
+            browser.Bind(common.EVT_EDITOR_CHANGED, self._refresh_all)
             self.add_editor(browser, _('Browser'))
             info = radioinfo.ChirpRadioInfo(parent_radio, self._editors)
             self.add_editor(info, _('Info'))
 
         # After the GUI is built, set focus to the current editor
         wx.CallAfter(self.current_editor.SetFocus)
+
+    def _refresh_all(self, event):
+        LOG.info('Radio browser changed; refreshing all others')
+        for i in range(self._editors.GetPageCount()):
+            editor = self._editors.GetPage(i)
+            if editor.GetId() != event.GetId():
+                LOG.debug('refreshing %s' % editor)
+                editor.refresh()
 
     def _editor_changed(self, event):
         self._modified = True
@@ -195,7 +197,17 @@ class ChirpEditorSet(wx.Panel):
     def current_editor_index(self):
         return self._editors.GetSelection()
 
-    def select_editor(self, index):
+    def select_editor(self, index=None, name=None):
+        if index is None and name:
+            try:
+                index = self._editors.FindPage(self._editor_index[name])
+            except KeyError:
+                LOG.error('No editor %r to select' % name)
+                return
+        if index is None:
+            LOG.error('Unable to find editor to select (%r/%r',
+                      index, name)
+            return
         self._editors.SetSelection(index)
 
     def cb_copy(self, cut=False):
@@ -260,18 +272,13 @@ class ChirpWelcomePanel(wx.Panel):
     def __init__(self, *a, **k):
         super(ChirpWelcomePanel, self).__init__(*a, **k)
 
-        try:
-            welcome = pkg_path('share', 'welcome_screen.png')
-        except FileNotFoundError as e:
-            LOG.error('Unable to find welcome image: %s' % e)
-            return
-        if not os.path.exists(welcome):
-            LOG.error('Unable to find welcome image %r:' % welcome)
-            return
-
         vbox = wx.BoxSizer(wx.VERTICAL)
         self.SetSizer(vbox)
-        bmp = wx.Bitmap(welcome)
+        with importlib_resources.as_file(
+            importlib_resources.files('chirp.share')
+            .joinpath('welcome_screen.png')
+        ) as welcome:
+            bmp = wx.Bitmap(str(welcome))
         width, height = self.GetSize()
         img = wx.StaticBitmap(self, wx.ID_ANY, bmp)
         vbox.Add(img, 1, flag=wx.EXPAND)
@@ -325,12 +332,11 @@ class ChirpMain(wx.Frame):
             icon = 'chirp.ico'
         else:
             icon = 'chirp.png'
-        try:
-            self.SetIcon(wx.Icon(pkg_path('share', icon)))
-        except FileNotFoundError:
-            pass
-        except Exception as e:
-            LOG.exception('Failed to SetIcon: %s' % e)
+        with importlib_resources.as_file(
+            importlib_resources.files('chirp.share')
+            .joinpath(icon)
+        ) as path:
+            self.SetIcon(wx.Icon(str(path)))
 
     @property
     def current_editorset(self):
@@ -381,11 +387,13 @@ class ChirpMain(wx.Frame):
             user_stock_confs = sorted(os.listdir(user_stock_dir))
         except FileNotFoundError:
             user_stock_confs = []
-        try:
-            dist_stock_dir = pkg_path('stock_configs', '')
-            dist_stock_confs = sorted(os.listdir(dist_stock_dir))
-        except FileNotFoundError:
-            dist_stock_confs = []
+        dist_stock_confs = sorted(
+            [
+                conf.name for conf
+                in importlib_resources.files('chirp.stock_configs').iterdir()
+                if conf.is_file()
+            ]
+        )
 
         def add_stock(fn):
             submenu_item = stock.Append(wx.ID_ANY, fn)
@@ -527,6 +535,16 @@ class ChirpMain(wx.Frame):
         source_menu = wx.Menu()
         radio_menu.AppendSubMenu(source_menu, _('Query Source'))
 
+        query_rrca_item = wx.MenuItem(source_menu,
+                                      wx.NewId(), 'RadioReference.com Canada')
+        self.Bind(wx.EVT_MENU, self._menu_query_rrca, query_rrca_item)
+        source_menu.Append(query_rrca_item)
+        # Soon to be implemented
+        # query_rrus_item = wx.MenuItem(source_menu,
+        # wx.NewId(), 'RadioReference USA')
+        # self.Bind(wx.EVT_MENU, self._menu_query_rrus, query_rrus_item)
+        # source_menu.Append(query_rrus_item)
+
         query_rb_item = wx.MenuItem(source_menu, wx.NewId(), 'RepeaterBook')
         self.Bind(wx.EVT_MENU, self._menu_query_rb, query_rb_item)
         source_menu.Append(query_rb_item)
@@ -607,16 +625,19 @@ class ChirpMain(wx.Frame):
         help_menu.Append(reporting_menu)
         reporting_menu.Check(not CONF.get_bool('no_report', default=False))
 
-        debug_log_menu = wx.MenuItem(help_menu, wx.NewId(),
-                                     _('Open debug log'))
-        self.Bind(wx.EVT_MENU, self._menu_debug_log, debug_log_menu)
-        help_menu.Append(debug_log_menu)
+        if logger.Logger.instance.has_debug_log_file:
+            # Only expose these debug log menu elements if we are logging to
+            # a debug.log file this session.
+            debug_log_menu = wx.MenuItem(help_menu, wx.NewId(),
+                                         _('Open debug log'))
+            self.Bind(wx.EVT_MENU, self._menu_debug_log, debug_log_menu)
+            help_menu.Append(debug_log_menu)
 
-        if platform.system() in ('Windows', 'Darwin'):
-            debug_loc_menu = wx.MenuItem(help_menu, wx.NewId(),
-                                         _('Show debug log location'))
-            self.Bind(wx.EVT_MENU, self._menu_debug_loc, debug_loc_menu)
-            help_menu.Append(debug_loc_menu)
+            if platform.system() in ('Windows', 'Darwin'):
+                debug_loc_menu = wx.MenuItem(help_menu, wx.NewId(),
+                                             _('Show debug log location'))
+                self.Bind(wx.EVT_MENU, self._menu_debug_loc, debug_loc_menu)
+                help_menu.Append(debug_loc_menu)
 
         menu_bar = wx.MenuBar()
         menu_bar.Append(file_menu, '&File')
@@ -753,7 +774,7 @@ class ChirpMain(wx.Frame):
         for i in range(self._editors.GetPageCount()):
             editorset = self._editors.GetPage(i)
             self._editors.ChangeSelection(i)
-            if not self._prompt_to_close_editor(editorset, True):
+            if not self._prompt_to_close_editor(editorset):
                 if event.CanVeto():
                     event.Veto()
                 return
@@ -808,7 +829,10 @@ class ChirpMain(wx.Frame):
         user_stock_dir = chirp_platform.get_platform().config_file(
             "stock_configs")
         user_stock_conf = os.path.join(user_stock_dir, fn)
-        with importlib.resources.path('stock_configs', fn) as path:
+        with importlib_resources.as_file(
+            importlib_resources.files('chirp.stock_configs')
+            .joinpath(fn)
+        ) as path:
             dist_stock_conf = str(path)
         if os.path.exists(user_stock_conf):
             filename = user_stock_conf
@@ -880,17 +904,16 @@ class ChirpMain(wx.Frame):
                 return
             self.current_editorset.export_to_file(fd.GetPath())
 
-    def _prompt_to_close_editor(self, editorset, allow_cancel=False):
+    def _prompt_to_close_editor(self, editorset):
         """Returns True if it is okay to close the editor, False otherwise"""
         if not editorset.modified:
             return True
 
-        also_cancel = wx.CANCEL if allow_cancel else 0
         answer = wx.MessageBox(
             _('%s has not been saved. Save before closing?') % (
                 editorset.filename),
             _('Save before closing?'),
-            wx.YES_NO | wx.YES_DEFAULT | also_cancel | wx.ICON_WARNING)
+            wx.YES_NO | wx.YES_DEFAULT | wx.CANCEL | wx.ICON_WARNING)
         if answer == wx.NO:
             # User does not want to save, okay to close
             return True
@@ -1020,13 +1043,15 @@ class ChirpMain(wx.Frame):
         # Kill the current editorset now that we know the radio loaded
         # successfully
         last_editor = self.current_editorset.current_editor_index
-        self._menu_close(event)
+        self.current_editorset.close()
+        self._editors.DeletePage(self._editors.GetSelection())
+        self._update_window_for_editor()
 
         # Mimic the File->Open process to get a new editorset based
         # on our franken-radio
         editorset = ChirpEditorSet(new_radio, filename, self._editors)
         self.add_editorset(editorset, select=True)
-        editorset.select_editor(last_editor)
+        editorset.select_editor(index=last_editor)
         editorset.current_editor.set_scroll_pos(editor_pos)
 
         LOG.info('Reloaded radio driver%s in place; good luck!' % (
@@ -1151,6 +1176,23 @@ class ChirpMain(wx.Frame):
             LOG.info('Selected bandplan: %s' % selected)
             for shortname, name in plans:
                 CONF.set_bool(shortname, shortname == selected, 'bandplan')
+
+    def _menu_query_rrca(self, event):
+        d = query_sources.RRCAQueryDialog(self,
+                                          title='Query RadioReference.com '
+                                                '(Canada)')
+        r = d.ShowModal()
+        if r == wx.ID_OK:
+            LOG.debug('Result file: %s' % d.result_file)
+            self.open_file(d.result_file)
+
+    def _menu_query_rrus(self, event):
+        d = query_sources.RRUSQueryDialog(self,
+                                          title='Query RadioReference (USA)')
+        r = d.ShowModal()
+        if r == wx.ID_OK:
+            LOG.debug('Result file: %s' % d.result_file)
+            self.open_file(d.result_file)
 
     def _menu_query_rb(self, event):
         d = query_sources.RepeaterBookQueryDialog(

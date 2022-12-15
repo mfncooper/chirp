@@ -38,7 +38,6 @@ class ChirpSettingsEdit(common.ChirpEditor):
         sizer.Add(self._group_control, 1, wx.EXPAND)
 
         self._initialized = False
-        self._group_control.Bind(wx.EVT_PAINT, self._activate)
 
     def _initialize(self, job):
         self.stop_wait_dialog()
@@ -48,12 +47,17 @@ class ChirpSettingsEdit(common.ChirpEditor):
             self._settings = job.result
             self._load_settings()
 
-    def _activate(self, event):
+    def selected(self):
         if not self._initialized:
             self._initialized = True
             self.start_wait_dialog(_('Getting settings'))
             self.do_radio(lambda job: wx.CallAfter(self._initialize, job),
                           'get_settings')
+
+    def refresh(self):
+        self._group_control.DeleteAllPages()
+        # Next select will re-load everything
+        self._initialized = False
 
     def _load_settings(self):
         for group in self._settings:
@@ -118,10 +122,14 @@ class ChirpSettingsEdit(common.ChirpEditor):
             else:
                 self._apply_setting_group(all_values, element)
 
+    def _set_settings_cb(self, job):
+        if isinstance(job.result, Exception):
+            common.error_proof.show_error(str(job.result))
+
     def _changed(self, event):
         if not self._apply_settings():
             return
-        self.do_radio(None, 'set_settings', self._settings)
+        self.do_radio(self._set_settings_cb, 'set_settings', self._settings)
         wx.PostEvent(self, common.EditorChanged(self.GetId()))
 
     def saved(self):
