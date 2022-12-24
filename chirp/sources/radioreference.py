@@ -14,9 +14,14 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import logging
+import threading
+
 from chirp import chirp_common, errors
+from chirp.sources import base
+from chirp.wxui import config
 
 LOG = logging.getLogger(__name__)
+CONF = config.get()
 
 try:
     from suds.client import Client
@@ -33,19 +38,47 @@ MODES = {
     "USB":    "USB",
     "LSB":    "LSB",
     "P25":    "P25",
+    "DMR":    "DMR",
 }
 
+CA_COUNTIES = []
+CA_PROVINCES = {}
+logging.getLogger('suds').setLevel(logging.WARNING)
 
-class RadioReferenceRadio(chirp_common.NetworkSourceRadio):
+
+class RadioReferenceCAData(threading.Thread):
+    def __init__(self, callback, username, password):
+        super().__init__()
+        self._callback = callback
+        self._username = username
+        self._password = password
+
+    def run(self):
+        radio = RadioReferenceRadio()
+        radio.set_auth(self._username, self._password)
+        try:
+            counties, provinces = radio.do_getcanadacounties()
+            LOG.debug('Got counties: %r' % counties)
+            LOG.debug('Got provinces: %r' % provinces)
+            CA_COUNTIES.clear()
+            CA_COUNTIES.extend(counties)
+            CA_PROVINCES.clear()
+            CA_PROVINCES.update(provinces)
+            self._callback(True)
+        except Exception as e:
+            LOG.exception('Failed to query RR: %s' % e)
+            self._callback(e)
+
+
+class RadioReferenceRadio(base.NetworkResultRadio):
     """RadioReference.com data source"""
-    VENDOR = "Radio Reference LLC"
-    MODEL = "RadioReference.com"
+    VENDOR = "RadioReference"
 
     URL = "http://api.radioreference.com/soap2/?wsdl"
     APPKEY = "46785108"
 
-    def __init__(self, *args, **kwargs):
-        chirp_common.NetworkSourceRadio.__init__(self, *args, **kwargs)
+    def __init__(self):
+        chirp_common.NetworkSourceRadio.__init__(self, None)
 
         if not HAVE_SUDS:
             raise errors.RadioError(
@@ -54,15 +87,12 @@ class RadioReferenceRadio(chirp_common.NetworkSourceRadio):
 
         self._auth = {"appKey": self.APPKEY, "username": "", "password": ""}
         self._client = Client(self.URL)
-        self._freqs = None
+        self._freqs = []
         self._modes = None
         self._zipcounty = None
         self._country = None
 
-    def set_params(self, zipcounty, username, password, country):
-        """Set the parameters to be used for a query"""
-        self._country = country
-        self._zipcounty = zipcounty
+    def set_auth(self, username, password):
         self._auth["username"] = username
         self._auth["password"] = password
 
@@ -85,63 +115,63 @@ class RadioReferenceRadio(chirp_common.NetworkSourceRadio):
             raise errors.RadioError(err)
         return clist, provinces
 
-    def do_fetch(self):
+    def do_fetch(self, status, params):
         """Fetches frequencies for all subcategories in a county
         (or zip if USA)."""
+        status.send_status('Querying...', 5)
         self._freqs = []
         # if this method was accessed for the USA, use the zip; otherwise
         # use the county ID
-        if self._country == 'US':
+        if params['country'] == 'US':
             try:
                 service = self._client.service
-                zipcode = service.getZipcodeInfo(self._zipcounty, self._auth)
+                zipcode = service.getZipcodeInfo(params['zipcounty'],
+                                                 self._auth)
                 county = service.getCountyInfo(zipcode.ctid, self._auth)
             except WebFault as err:
                 raise errors.RadioError(err)
-        if self._country == 'CA':
+        elif params['country'] == 'CA':
             try:
                 service = self._client.service
-                county = service.getCountyInfo(self._zipcounty, self._auth)
+                county = service.getCountyInfo(params['zipcounty'],
+                                               self._auth)
             except WebFault as err:
                 raise errors.RadioError(err)
 
-        status = chirp_common.Status()
-        status.max = 0
+        status_max = 0
+        status_cur = 0
         for cat in county.cats:
-            status.max += len(cat.subcats)
-        status.max += len(county.agencyList)
+            status_max += len(cat.subcats)
+        status_max += len(county.agencyList)
 
         for cat in county.cats:
-            LOG.debug("Fetching category:", cat.cName)
             for subcat in cat.subcats:
-                LOG.debug("\t", subcat.scName)
                 result = self._client.service.getSubcatFreqs(subcat.scid,
                                                              self._auth)
                 self._freqs += result
-                status.cur += 1
-                self.status_fn(status)
-        status.max -= len(county.agencyList)
+                status_cur += 1
+                status.send_status(
+                    'Fetching %s:%s' % (cat.cName, subcat.scName),
+                    status_cur / status_max * 100)
+
         for agency in county.agencyList:
             agency = self._client.service.getAgencyInfo(agency.aid, self._auth)
             for cat in agency.cats:
-                status.max += len(cat.subcats)
+                status_max += len(cat.subcats)
             for cat in agency.cats:
-                LOG.debug("Fetching category:", cat.cName)
                 for subcat in cat.subcats:
-                    try:
-                        LOG.debug("\t", subcat.scName)
-                    except AttributeError:
-                        pass
                     result = self._client.service.getSubcatFreqs(subcat.scid,
                                                                  self._auth)
                     self._freqs += result
-                    status.cur += 1
-                    self.status_fn(status)
+                    status_cur += 1
+                    status.send_status(
+                        'Fetching agency %s %s:%s' % (agency.aid,
+                                                      cat.cName,
+                                                      subcat.scName),
+                        status_cur / status_max * 100)
+        status.send_end()
 
     def get_features(self):
-        if not self._freqs:
-            self.do_fetch()
-
         rf = chirp_common.RadioFeatures()
         rf.memory_bounds = (0, len(self._freqs)-1)
         rf.has_bank = False
@@ -187,6 +217,8 @@ class RadioReferenceRadio(chirp_common.NetworkSourceRadio):
         try:
             mem.mode = self._get_mode(freq.mode)
         except KeyError:
+            LOG.debug('Mode %s (%s) is unsupported' % (
+                freq.mode, self._modes[int(str(freq.mode))]))
             # skip memory if mode is unsupported
             mem.empty = True
             return mem

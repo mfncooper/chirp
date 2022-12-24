@@ -39,6 +39,7 @@ from chirp import directory
 from chirp import errors
 from chirp import logger
 from chirp import platform as chirp_platform
+from chirp.sources import base
 from chirp.wxui import config
 from chirp.wxui import bankedit
 from chirp.wxui import common
@@ -70,6 +71,8 @@ class ChirpEditorSet(wx.Panel):
 
     @property
     def tab_name(self):
+        if isinstance(self._radio, base.NetworkResultRadio):
+            return self._radio.get_label()
         return '%s.%s' % (self.default_filename,
                           self._radio.FILE_EXTENSION)
 
@@ -173,6 +176,8 @@ class ChirpEditorSet(wx.Panel):
 
     @property
     def modified(self):
+        if isinstance(self._radio, base.NetworkResultRadio):
+            return False
         return self._modified
 
     @property
@@ -539,15 +544,10 @@ class ChirpMain(wx.Frame):
         source_menu = wx.Menu()
         radio_menu.AppendSubMenu(source_menu, _('Query Source'))
 
-        query_rrca_item = wx.MenuItem(source_menu,
-                                      wx.NewId(), 'RadioReference.com Canada')
-        self.Bind(wx.EVT_MENU, self._menu_query_rrca, query_rrca_item)
-        source_menu.Append(query_rrca_item)
-        # Soon to be implemented
-        # query_rrus_item = wx.MenuItem(source_menu,
-        # wx.NewId(), 'RadioReference USA')
-        # self.Bind(wx.EVT_MENU, self._menu_query_rrus, query_rrus_item)
-        # source_menu.Append(query_rrus_item)
+        query_rr_item = wx.MenuItem(source_menu,
+                                    wx.NewId(), 'RadioReference.com')
+        self.Bind(wx.EVT_MENU, self._menu_query_rr, query_rr_item)
+        source_menu.Append(query_rr_item)
 
         query_rb_item = wx.MenuItem(source_menu, wx.NewId(), 'RepeaterBook')
         self.Bind(wx.EVT_MENU, self._menu_query_rb, query_rb_item)
@@ -556,6 +556,10 @@ class ChirpMain(wx.Frame):
         query_dm_item = wx.MenuItem(source_menu, wx.NewId(), 'DMR-MARC')
         self.Bind(wx.EVT_MENU, self._menu_query_dm, query_dm_item)
         source_menu.Append(query_dm_item)
+
+        query_mg_item = wx.MenuItem(source_menu, wx.NewId(), 'myGMRS')
+        self.Bind(wx.EVT_MENU, self._menu_query_mg, query_mg_item)
+        source_menu.Append(query_mg_item)
 
         radio_menu.Append(wx.MenuItem(radio_menu, wx.ID_SEPARATOR))
 
@@ -759,12 +763,14 @@ class ChirpMain(wx.Frame):
         CSVRadio = directory.get_radio('Generic_CSV')
         if eset is not None:
             is_live = isinstance(eset.radio, chirp_common.LiveRadio)
+            is_network = isinstance(eset.radio,
+                                    base.NetworkResultRadio)
             can_close = True
-            can_save = eset.modified and not is_live
-            can_saveas = not is_live
+            can_save = eset.modified and not is_live and not is_network
+            can_saveas = not is_live and not is_network
             can_upload = (not isinstance(eset.radio, CSVRadio) and
                           not isinstance(eset.radio, common.LiveAdapter) and
-                          not is_live)
+                          not is_live and not is_network)
             can_goto = isinstance(eset.current_editor, memedit.ChirpMemEdit)
 
         items = [
@@ -1194,39 +1200,26 @@ class ChirpMain(wx.Frame):
             for shortname, name in plans:
                 CONF.set_bool(shortname, shortname == selected, 'bandplan')
 
-    def _menu_query_rrca(self, event):
-        d = query_sources.RRCAQueryDialog(self,
-                                          title='Query RadioReference.com '
-                                                '(Canada)')
+    def _do_network_query(self, query_cls):
+        d = query_cls(self, title=_('Query %s') % query_cls.NAME)
         r = d.ShowModal()
         if r == wx.ID_OK:
-            LOG.debug('Result file: %s' % d.result_file)
-            self.open_file(d.result_file)
+            report.report_model(d.result_radio, 'query')
+            editorset = ChirpEditorSet(d.result_radio,
+                                       None, self._editors)
+            self.add_editorset(editorset)
 
-    def _menu_query_rrus(self, event):
-        d = query_sources.RRUSQueryDialog(self,
-                                          title='Query RadioReference (USA)')
-        r = d.ShowModal()
-        if r == wx.ID_OK:
-            LOG.debug('Result file: %s' % d.result_file)
-            self.open_file(d.result_file)
+    def _menu_query_rr(self, event):
+        self._do_network_query(query_sources.RRQueryDialog)
 
     def _menu_query_rb(self, event):
-        d = query_sources.RepeaterBookQueryDialog(
-            self, title=_('Query %s') % 'Repeaterbook')
-        r = d.ShowModal()
-        from chirp.drivers import repeaterbook
-        if r == wx.ID_OK:
-            LOG.debug('Result file: %s' % d.result_file)
-            self.open_file(d.result_file, rclass=repeaterbook.RBRadio)
+        self._do_network_query(query_sources.RepeaterBookQueryDialog)
 
     def _menu_query_dm(self, event):
-        d = query_sources.DMRMARCQueryDialog(
-                self, title=_('Query %s') % 'DMR-MARC')
-        r = d.ShowModal()
-        if r == wx.ID_OK:
-            LOG.debug('Result file: %s' % d.result_file)
-            self.open_file(d.result_file)
+        self._do_network_query(query_sources.DMRMARCQueryDialog)
+
+    def _menu_query_mg(self, event):
+        self._do_network_query(query_sources.MyGMRSQueryDialog)
 
 
 def display_update_notice(version):

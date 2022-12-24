@@ -193,7 +193,7 @@
 | <a name="LUITON_LT-725UV"></a> LUITON_LT-725UV | [@KC9HI](https://github.com/KC9HI) | 11-Dec-2022 | Yes | 0.02% |
 | <a name="Lanchonlh_HG-UV98"></a> Lanchonlh_HG-UV98 |  |  | Yes | 0.00% |
 | <a name="Leixen_VV-898"></a> Leixen_VV-898 | [Implied by Jetstream_JT270MH](#user-content-Jetstream_JT270MH) | 13-Dec-2022 | Yes | 0.18% |
-| <a name="Leixen_VV-898S"></a> Leixen_VV-898S | [Implied by Jetstream_JT270MH](#user-content-Jetstream_JT270MH) | 13-Dec-2022 | Yes | 0.10% |
+| <a name="Leixen_VV-898S"></a> Leixen_VV-898S | [@READ10](https://github.com/READ10) | 19-Dec-2022 | Yes | 0.10% |
 | <a name="MTC_UV-5R-3"></a> MTC_UV-5R-3 | [Implied by BTECH_UV-5X3](#user-content-BTECH_UV-5X3) | 9-Dec-2022 | Yes | 0.02% |
 | <a name="Midland_DBR2500"></a> Midland_DBR2500 | [Implied by Retevis_RT95](#user-content-Retevis_RT95) | 13-Nov-2022 | Yes | 0.05% |
 | <a name="Polmar_DB-50M"></a> Polmar_DB-50M | [Implied by AnyTone_5888UV](#user-content-AnyTone_5888UV) | 9-Dec-2022 | Yes | 0.03% |
@@ -215,11 +215,12 @@
 | <a name="Radioddity_DB25-G"></a> Radioddity_DB25-G | [@KC9HI](https://github.com/KC9HI) | 11-Nov-2022 | Yes | 0.17% |
 | <a name="Radioddity_GA-2S"></a> Radioddity_GA-2S | [@KC9HI](https://github.com/KC9HI) | 4-Dec-2022 | Yes | 0.19% |
 | <a name="Radioddity_GA-510"></a> Radioddity_GA-510 | [@kk7ds](https://github.com/kk7ds) | 21-Oct-2022 | Yes | 0.42% |
-| <a name="Radioddity_R2"></a> Radioddity_R2 | [@KC9HI](https://github.com/KC9HI) | 17-Dec-2022 | Yes | 0.36% |
+| <a name="Radioddity_R2"></a> Radioddity_R2 | [@KC9HI](https://github.com/KC9HI) | 17-Dec-2022 | Yes | 0.04% |
 | <a name="Radioddity_UV-5G"></a> Radioddity_UV-5G | [@KC9HI](https://github.com/KC9HI) | 18-Nov-2022 | Yes | 0.47% |
 | <a name="Radioddity_UV-5RX3"></a> Radioddity_UV-5RX3 | [@KC9HI](https://github.com/KC9HI) | 18-Nov-2022 | Yes | 0.90% |
 | <a name="Radioddity_UV-82X3"></a> Radioddity_UV-82X3 | [@KC9HI](https://github.com/KC9HI) | 18-Nov-2022 | Yes | 0.05% |
 | <a name="Radtel_T18"></a> Radtel_T18 | [@KC9HI](https://github.com/KC9HI) | 28-Nov-2022 | Yes | 0.07% |
+| <a name="Retevis_H777S"></a> Retevis_H777S | [@KC9HI](https://github.com/KC9HI) | 22-Dec-2022 | Yes |  |
 | <a name="Retevis_H777_Plus"></a> Retevis_H777_Plus | [@KC9HI](https://github.com/KC9HI) | 4-Dec-2022 | Yes | 0.06% |
 | <a name="Retevis_RA685"></a> Retevis_RA685 | [@KC9HI](https://github.com/KC9HI) | 19-Nov-2022 | Yes | 0.25% |
 | <a name="Retevis_RA85"></a> Retevis_RA85 | [@KC9HI](https://github.com/KC9HI) | 19-Nov-2022 | Yes | 0.05% |
@@ -251,6 +252,7 @@
 | <a name="Retevis_RT22FRS"></a> Retevis_RT22FRS | [@KC9HI](https://github.com/KC9HI) | 9-Dec-2022 | Yes | 0.04% |
 | <a name="Retevis_RT22S"></a> Retevis_RT22S | [@KC9HI](https://github.com/KC9HI) | 28-Nov-2022 | Yes | 0.04% |
 | <a name="Retevis_RT23"></a> Retevis_RT23 | [@KC9HI](https://github.com/KC9HI) | 17-Dec-2022 | Yes | 0.04% |
+| <a name="Retevis_RT24"></a> Retevis_RT24 | [@KC9HI](https://github.com/KC9HI) | 22-Dec-2022 | Yes | 0.31% |
 | <a name="Retevis_RT26"></a> Retevis_RT26 | [@KC9HI](https://github.com/KC9HI) | 17-Dec-2022 | Yes | 0.03% |
 | <a name="Retevis_RT29_UHF"></a> Retevis_RT29_UHF | [@KC9HI](https://github.com/KC9HI) | 30-Nov-2022 | Yes | 0.03% |
 | <a name="Retevis_RT29_VHF"></a> Retevis_RT29_VHF | [@KC9HI](https://github.com/KC9HI) | 30-Nov-2022 | Yes | 0.02% |
@@ -307,7 +309,7 @@
 | <a name="Wouxun_KG-UV8D"></a> Wouxun_KG-UV8D |  |  |  | 0.24% |
 | <a name="Wouxun_KG-UV8D_Plus"></a> Wouxun_KG-UV8D_Plus |  |  |  | 0.08% |
 | <a name="Wouxun_KG-UV8E"></a> Wouxun_KG-UV8E |  |  |  | 0.05% |
-| <a name="Wouxun_KG-UV920P-A"></a> Wouxun_KG-UV920P-A |  |  |  | 0.04% |
+| <a name="Wouxun_KG-UV920P-A"></a> Wouxun_KG-UV920P-A | [@KC9HI](https://github.com/KC9HI) | 22-Dec-2022 | Yes | 0.04% |
 | <a name="Wouxun_KG-UV9D_Plus"></a> Wouxun_KG-UV9D_Plus |  |  |  | 0.39% |
 | <a name="Wouxun_KG-UVD1P"></a> Wouxun_KG-UVD1P | [Implied by Wouxun_KG-UV6](#user-content-Wouxun_KG-UV6) | 11-Dec-2022 | Yes | 0.35% |
 | <a name="Yaesu_FT-1500M"></a> Yaesu_FT-1500M | [@f3sty](https://github.com/f3sty) | 05-Dec-2022 | Yes | 0.02% |
@@ -358,11 +360,11 @@
 | <a name="Zastone_ZT-X6"></a> Zastone_ZT-X6 | [Implied by Retevis_RT22](#user-content-Retevis_RT22) | 9-Dec-2022 | Yes | 0.11% |
 ## Stats
 
-**Drivers:** 355
+**Drivers:** 357
 
-**Tested:** 74% (264/91) (89% of usage stats)
+**Tested:** 74% (267/90) (89% of usage stats)
 
-**Byte clean:** 83% (296/59)
+**Byte clean:** 83% (299/58)
 
 ## Meaning of this testing
 

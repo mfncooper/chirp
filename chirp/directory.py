@@ -23,7 +23,7 @@ import sys
 
 import six
 
-from chirp import chirp_common, util, radioreference, errors
+from chirp import chirp_common, util, errors
 
 LOG = logging.getLogger(__name__)
 
@@ -124,19 +124,6 @@ MODEL_COMPAT = {
 
 def get_radio_by_image(image_file):
     """Attempt to get the radio class that owns @image_file"""
-    if image_file.startswith("radioreference://"):
-        _, _, zipcode, username, password, country = image_file.split("/", 5)
-        rr = radioreference.RadioReferenceRadio(None)
-        rr.set_params(zipcode, username, password, country)
-        return rr
-
-    # FIXME: Disable rfinder until the module is fixed
-    if image_file.startswith("rfinder://") and False:
-        _, _, email, passwd, lat, lon, miles = image_file.split("/")
-        rf = rfinder.RFinderRadio(None)
-        rf.set_params((float(lat), float(lon)), int(miles), email, passwd)
-        return rf
-
     if os.path.exists(image_file):
         with open(image_file, "rb") as f:
             filedata = f.read()

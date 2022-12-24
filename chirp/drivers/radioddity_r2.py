@@ -66,7 +66,7 @@ struct {
     mode:1,
     unknown2:1,
     bclo:1;
-  u8 unknown3[3];
+  u8 reserved[3];
 } memory[16];
 
 #seekto 0x03C0;
@@ -101,7 +101,7 @@ SCANMODE_LIST = ["Carrier", "Timer"]
 VOICE_LIST = ["Off", "Chinese", "English"]
 VOX_LIST = ["Off"] + ["%s" % x for x in range(1, 9)]
 VOXDELAY_LIST = ["0.5", "1.0", "1.5", "2.0", "2.5", "3.0"]
-MODE_LIST = ["WFM", "NFM"]
+MODE_LIST = ["FM", "NFM"]
 
 TONES = chirp_common.TONES
 DTCS_CODES = chirp_common.DTCS_CODES
@@ -114,6 +114,18 @@ SETTING_LISTS = {
     "voxdelay": VOXDELAY_LIST,
     "mode": MODE_LIST,
     }
+
+FRS16_FREQS = [462562500, 462587500, 462612500, 462637500,
+               462662500, 462625000, 462725000, 462687500,
+               462712500, 462550000, 462575000, 462600000,
+               462650000, 462675000, 462700000, 462725000]
+
+PMR_FREQS1 = [446006250, 446018750, 446031250, 446043750, 446056250,
+              446068750, 446081250, 446093750]
+PMR_FREQS2 = [446106250, 446118750, 446131250, 446143750, 446156250,
+              446168750, 446181250, 446193750]
+
+PMR_FREQS = PMR_FREQS1 + PMR_FREQS2
 
 VALID_CHARS = chirp_common.CHARSET_ALPHANUMERIC + \
     "`{|}!\"#$%&'()*+,-./:;<=>?@[]^_"
@@ -298,6 +310,7 @@ def do_upload(radio):
     _r2_exit_programming_mode(radio)
 
 
+@directory.register
 class RadioddityR2(chirp_common.CloneModeRadio):
     """Radioddity R2"""
     VENDOR = "Radioddity"
@@ -317,6 +330,8 @@ class RadioddityR2(chirp_common.CloneModeRadio):
     _range = [400000000, 470000000]
     # maximum 16 channels
     _upper = 16
+
+    _frs16 = _pmr = False
 
     def get_features(self):
         rf = chirp_common.RadioFeatures()
@@ -348,7 +363,7 @@ class RadioddityR2(chirp_common.CloneModeRadio):
             "DTCS->",
             "DTCS->DTCS"]
         rf.valid_power_levels = POWER_LEVELS
-        rf.valid_skips = []
+        rf.valid_skips = ["", "S"]
         rf.valid_bands = [self._range]
         rf.memory_bounds = (1, self._upper)
         rf.valid_tuning_steps = [2.5, 5.0, 6.25, 10.0, 12.5, 25.0]
@@ -437,6 +452,16 @@ class RadioddityR2(chirp_common.CloneModeRadio):
 
         mem.freq = int(_mem.rx_freq) * 10
 
+        # We'll consider any blank (i.e. 0MHz frequency) to be empty
+        if mem.freq == 0:
+            mem.empty = True
+            return mem
+
+        if _mem.rx_freq.get_raw() == "\xFF\xFF\xFF\xFF":
+            mem.freq = 0
+            mem.empty = True
+            return mem
+
         txfreq = int(_mem.tx_freq) * 10
         if txfreq == mem.freq:
             mem.duplex = ""
@@ -463,17 +488,14 @@ class RadioddityR2(chirp_common.CloneModeRadio):
         rxtone = self.decode_tone(_mem.rx_tone)
         chirp_common.split_tone_decode(mem, txtone, rxtone)
 
+        if not _mem.scanadd:
+            mem.skip = "S"
+
         mem.power = POWER_LEVELS[_mem.power]
 
         # add extra channel settings to the OTHER tab of the properties
         # extra settings are unfortunately inverted
         mem.extra = RadioSettingGroup("extra", "Extra")
-
-        scanadd = RadioSetting("scanadd", "Scan Add",
-                               RadioSettingValueBoolean(
-                                   not bool(_mem.scanadd)))
-        scanadd.set_doc("Add channel for scanning")
-        mem.extra.append(scanadd)
 
         bclo = RadioSetting("bclo", "Busy Lockout",
                             RadioSettingValueBoolean(not bool(_mem.bclo)))
@@ -502,9 +524,31 @@ class RadioddityR2(chirp_common.CloneModeRadio):
         # Get a low-level memory object mapped to the image
         _mem = self._memobj.memory[mem.number - 1]
 
-        LOG.warning('This driver may be broken for deleted memories')
+        _rsvd = _mem.reserved.get_raw()
+
         if mem.empty:
+            _mem.set_raw("\xFF" * 13 + _rsvd)
             return
+
+        if self._frs16:
+            if _mem.rx_freq.get_raw() == "\xFF\xFF\xFF\xFF":
+                FRS_FREQ = FRS16_FREQS[mem.number - 1]
+                mem.freq = FRS_FREQ
+                mem.power = POWER_LEVELS[1]
+            if mem.freq in FRS16_FREQS:
+                mem.mode = "NFM"
+                mem.duplex == ''
+                mem.offset = 0
+
+        if self._pmr:
+            if _mem.rx_freq.get_raw() == "\xFF\xFF\xFF\xFF":
+                PMR_FREQ = PMR_FREQS[mem.number - 1]
+                mem.freq = PMR_FREQ
+            if mem.freq in PMR_FREQS:
+                mem.mode = "NFM"
+                mem.duplex == ''
+                mem.offset = 0
+                mem.power = POWER_LEVELS[0]
 
         _mem.rx_freq = mem.freq / 10
 
@@ -530,6 +574,7 @@ class RadioddityR2(chirp_common.CloneModeRadio):
         self.encode_tone(_mem.tx_tone, txmode, txtone, txpol)
         self.encode_tone(_mem.rx_tone, rxmode, rxtone, rxpol)
 
+        _mem.scanadd = mem.skip != "S"
         _mem.mode = MODE_LIST.index(mem.mode)
 
         # extra settings are unfortunately inverted
@@ -623,11 +668,19 @@ class RadioddityR2(chirp_common.CloneModeRadio):
         return False
 
 
-class RT24Alias(chirp_common.Alias):
+@directory.register
+class RetevisRT24(RadioddityR2):
+    """Retevis RT24"""
     VENDOR = "Retevis"
     MODEL = "RT24"
 
+    _pmr = True
+
 
 @directory.register
-class RadioddityR2Generic(RadioddityR2):
-    ALIASES = [RT24Alias]
+class RetevisH777S(RadioddityR2):
+    """Retevis H777S"""
+    VENDOR = "Retevis"
+    MODEL = "H777S"
+
+    _frs16 = True

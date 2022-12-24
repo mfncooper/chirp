@@ -153,7 +153,7 @@ Kenwood_TK-860,+Kenwood_TK-760,5-Dec-2022
 Kenwood_TK-862,+Kenwood_TK-760,5-Dec-2022
 Kenwood_TK-868,+Kenwood_TK-760,5-Dec-2022
 Leixen_VV-898,+Jetstream_JT270MH,13-Dec-2022
-Leixen_VV-898S,+Jetstream_JT270MH,13-Dec-2022
+Leixen_VV-898S,@READ10,19-Dec-2022
 LUITON_LT-316,+Retevis_RT22,9-Dec-2022
 LUITON_LT-580_UHF,@KC9HI,8-Dec-2022
 LUITON_LT-580_VHF,@KC9HI,8-Dec-2022
@@ -180,6 +180,7 @@ Radioddity_UV-5G,@KC9HI,18-Nov-2022
 Radioddity_UV-5RX3,@KC9HI,18-Nov-2022
 Radioddity_UV-82X3,@KC9HI,18-Nov-2022
 Radtel_T18,@KC9HI,28-Nov-2022
+Retevis_H777S,@KC9HI,22-Dec-2022
 Retevis_H777_Plus,@KC9HI,4-Dec-2022
 Retevis_RA685,@KC9HI,19-Nov-2022
 Retevis_RA85,@KC9HI,19-Nov-2022
@@ -210,6 +211,7 @@ Retevis_RT22,@KC9HI,9-Dec-2022
 Retevis_RT23,@KC9HI,17-Dec-2022
 Retevis_RT22FRS,@KC9HI,9-Dec-2022
 Retevis_RT22S,@KC9HI,28-Nov-2022
+Retevis_RT24,@KC9HI,22-Dec-2022
 Retevis_RT26,@KC9HI,17-Dec-2022
 Retevis_RT29_UHF,@KC9HI,30-Nov-2022
 Retevis_RT29_VHF,@KC9HI,30-Nov-2022
@@ -248,6 +250,7 @@ Wouxun_KG-816,+Wouxun_KG-UV6,11-Dec-2022
 Wouxun_KG-818,+Wouxun_KG-UV6,11-Dec-2022
 Wouxun_KG-UV6,@KC9HI,11-Dec-2022
 Wouxun_KG-UVD1P,+Wouxun_KG-UV6,11-Dec-2022
+Wouxun_KG-UV920P-A,@KC9HI,22-Dec-2022
 Yaesu_FT-1500M,@f3sty,05-Dec-2022
 Yaesu_FT-70D,@n8sqt,05-Dec-2022
 Yaesu_FT-7800_7900,@kk7ds,24-Oct-2022
